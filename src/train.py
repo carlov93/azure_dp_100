@@ -3,11 +3,31 @@ import argparse
 import joblib
 import os
 
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 import numpy as np
+import pandas as pd
+
+print("defining args")
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    '--param_1',
+    type=float,
+    dest='param_1',
+    default=0.2)
+parser.add_argument(
+    "--remote_execution",
+    dest="remote_execution",
+    action="store_true",
+    help="remote execution (AML compute)",
+    required=False,
+)
+
+print("parsing args")
+args = parser.parse_args()
+param_1 = args.param_1
+remote_execution = args.remote_execution
 
 
 def preprocessing(data, target_name):
@@ -34,28 +54,28 @@ def train(X_train, X_test, y_train, y_test, reg):
     # calculate accuracy
     y_hat = model.predict(X_test)
     acc = np.average(y_hat == y_test)
-    run.log('Accuracy', np.float(acc))
+
+    if remote_execution:
+        run.log('Accuracy', np.float(acc))
 
     # Save the trained model
     os.makedirs('outputs', exist_ok=True)
     joblib.dump(value=model, filename='outputs/model.pkl')
 
 
-def main():
+if remote_execution:
     #  get context from run
     run = Run.get_context()
 
-    #  Load Data
-    dataset = Dataset.get_by_name(ws, name = 'diabetes dataset')
-    dataset.to_pandas_dataframe()
-
     # Get parameters
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--param_1', type=float, dest='param_1', default=0.2)
-    args = parser.parse_args()
-    param_1 = args.param_1
     run.log('general_information', 'This is my first test')
     run.log("lr_decay", param_1)
 
-    X_train_scaled, X_test_scaled, y_train, y_test = preprocessing(dataset, 'Diabetic')
-    train(X_train_scaled, X_test_scaled, y_train, y_test, param_1)
+#  Load Data
+dataset=pd.read_csv('.data/diabetes.csv', sep=',', decimal='.')
+
+# Preprocess Data
+X_train_scaled, X_test_scaled, y_train, y_test = preprocessing(dataset, 'Diabetic')
+
+# Train Data
+train(X_train_scaled, X_test_scaled, y_train, y_test, param_1)
