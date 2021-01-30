@@ -9,6 +9,8 @@ from sklearn.linear_model import LogisticRegression
 import numpy as np
 import pandas as pd
 
+print(os.getcwd())
+
 print("defining args")
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -59,8 +61,8 @@ def train(X_train, X_test, y_train, y_test, reg):
         run.log('Accuracy', np.float(acc))
 
     # Save the trained model
-    os.makedirs('outputs', exist_ok=True)
-    joblib.dump(value=model, filename='outputs/model.pkl')
+    os.makedirs('../outputs', exist_ok=True)
+    joblib.dump(value=model, filename='../outputs/model.pkl')
 
 
 if remote_execution:
@@ -72,7 +74,7 @@ if remote_execution:
     run.log("lr_decay", param_1)
 
 #  Load Data
-dataset=pd.read_csv('.data/diabetes.csv', sep=',', decimal='.')
+dataset=pd.read_csv('../data/diabetes.csv', sep=',', decimal='.')
 
 # Preprocess Data
 X_train_scaled, X_test_scaled, y_train, y_test = preprocessing(dataset, 'Diabetic')
