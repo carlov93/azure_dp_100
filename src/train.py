@@ -1,6 +1,6 @@
 from azureml.core.run import Run
 import argparse
-import joblib
+import pickle
 import os
 
 from sklearn.preprocessing import StandardScaler
@@ -23,11 +23,17 @@ parser.add_argument(
     dest="remote_execution",
     default=False,
 )
+parser.add_argument(
+    "--path_data",
+    dest="path_data",
+    default='../data/diabetes.csv' #path for local debugging
+)
 
 print("parsing args")
 args = parser.parse_args()
 param_1 = args.param_1
 remote_execution = args.remote_execution
+path_data = args.path_data
 
 
 def preprocessing(data, target_name):
@@ -58,9 +64,10 @@ def train(X_train, X_test, y_train, y_test, reg):
     if remote_execution:
         run.log('Accuracy', np.float(acc))
 
-        # Save the trained model
-        joblib.dump(value=model, filename='./trained_models/model.pkl')
-
+    # Save the trained model
+    with open("model.pkl", "wb") as f:
+        pickle.dump(model, f)
+        f.close()
 
 if remote_execution:
     #  get context from run
@@ -71,7 +78,7 @@ if remote_execution:
     run.log("lr_decay", param_1)
 
 #  Load Data
-dataset=pd.read_csv('./data/diabetes.csv', sep=',', decimal='.')
+dataset=pd.read_csv(path_data, sep=',', decimal='.')
 
 # Preprocess Data
 X_train_scaled, X_test_scaled, y_train, y_test = preprocessing(dataset, 'Diabetic')
