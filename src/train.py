@@ -1,6 +1,6 @@
 from azureml.core.run import Run
 import argparse
-import pickle
+import joblib
 import os
 
 from sklearn.preprocessing import StandardScaler
@@ -26,7 +26,12 @@ parser.add_argument(
 parser.add_argument(
     "--path_data",
     dest="path_data",
-    default='../data/diabetes.csv' #path for local debugging
+    default='../data/diabetes.csv'  # path for local debugging
+)
+parser.add_argument(
+    "--path_trained_model",
+    dest="path_trained_model",
+    default='../trained_models/model.pkl'  # path for local debugging
 )
 
 print("parsing args")
@@ -34,7 +39,7 @@ args = parser.parse_args()
 param_1 = args.param_1
 remote_execution = args.remote_execution
 path_data = args.path_data
-
+path_trained_model = args.path_trained_model
 
 def preprocessing(data, target_name):
     # get feature and target
@@ -62,12 +67,21 @@ def train(X_train, X_test, y_train, y_test, reg):
     acc = np.average(y_hat == y_test)
 
     if remote_execution:
+        # Store training result
         run.log('Accuracy', np.float(acc))
 
-    # Save the trained model
-    with open("model.pkl", "wb") as f:
-        pickle.dump(model, f)
-        f.close()
+        # Save the trained model
+        os.makedirs('./trained_models', exist_ok=True)
+        joblib.dump(value=model, filename='./trained_models/diabetes_model.pkl')
+
+    else:
+        # Get training result
+        print('Model accuracy is: ' + str(acc))
+
+        # Save the trained model
+        os.makedirs('../trained_models', exist_ok=True)
+        joblib.dump(value=model, filename='../trained_models/diabetes_model.pkl')
+
 
 if remote_execution:
     #  get context from run
