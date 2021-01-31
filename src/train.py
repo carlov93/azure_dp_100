@@ -1,4 +1,5 @@
 from azureml.core.run import Run
+from azureml.core import Dataset
 import argparse
 import joblib
 import os
@@ -9,7 +10,7 @@ from sklearn.linear_model import LogisticRegression
 import numpy as np
 import pandas as pd
 
-print(os.getcwd())
+from config.config_training import script_params_local
 
 print("defining args")
 parser = argparse.ArgumentParser()
@@ -17,28 +18,28 @@ parser.add_argument(
     '--param_1',
     type=float,
     dest='param_1',
-    default=0.2)
+    default=script_params_local['param_1'])
 parser.add_argument(
     "--remote_execution",
     dest="remote_execution",
     default=False,
 )
 parser.add_argument(
-    "--path_data",
-    dest="path_data",
-    default='../data/diabetes.csv'  # path for local debugging
+    "--ds",
+    dest="source_dataset",
+    default=script_params_local['path_data']  # path for local debugging
 )
 parser.add_argument(
     "--path_trained_model",
     dest="path_trained_model",
-    default='../trained_models/model.pkl'  # path for local debugging
+    default=script_params_local['path_trained_model']  # path for local debugging
 )
 
 print("parsing args")
 args = parser.parse_args()
 param_1 = args.param_1
 remote_execution = args.remote_execution
-path_data = args.path_data
+source_dataset = args.source_dataset
 path_trained_model = args.path_trained_model
 
 def preprocessing(data, target_name):
@@ -71,16 +72,16 @@ def train(X_train, X_test, y_train, y_test, reg):
         run.log('Accuracy', np.float(acc))
 
         # Save the trained model
-        os.makedirs('./trained_models', exist_ok=True)
-        joblib.dump(value=model, filename='./trained_models/diabetes_model.pkl')
+        os.makedirs(path_trained_model, exist_ok=True)
+        joblib.dump(value=model, filename=path_trained_model + 'diabetes_model.pkl')
 
     else:
         # Get training result
         print('Model accuracy is: ' + str(acc))
 
         # Save the trained model
-        os.makedirs('../trained_models', exist_ok=True)
-        joblib.dump(value=model, filename='../trained_models/diabetes_model.pkl')
+        os.makedirs(path_trained_model, exist_ok=True)
+        joblib.dump(value=model, filename=path_trained_model + 'diabetes_model.pkl')
 
 
 if remote_execution:
@@ -92,10 +93,15 @@ if remote_execution:
     run.log("lr_decay", param_1)
 
 #  Load Data
-dataset=pd.read_csv(path_data, sep=',', decimal='.')
+if remote_execution:
+    tab_ds = run.input_datasets['diabetes_dataset']
+    df = tab_ds.to_pandas_dataframe()
+
+else:
+    df=pd.read_csv(source_dataset, sep=',', decimal='.')
 
 # Preprocess Data
-X_train_scaled, X_test_scaled, y_train, y_test = preprocessing(dataset, 'Diabetic')
+X_train_scaled, X_test_scaled, y_train, y_test = preprocessing(df, 'Diabetic')
 
 # Train Data
 train(X_train_scaled, X_test_scaled, y_train, y_test, param_1)
