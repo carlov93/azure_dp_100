@@ -1,5 +1,4 @@
 from azureml.core.run import Run
-from azureml.core import Dataset
 import argparse
 import joblib
 import os
@@ -8,7 +7,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 import numpy as np
-import pandas as pd
+import matplotlib.pyplot as plt
 
 from config.config_training import script_params_local
 
@@ -26,8 +25,8 @@ parser.add_argument(
 )
 parser.add_argument(
     "--ds",
-    dest="source_dataset",
-    default=script_params_local['path_data']  # path for local debugging
+    dest="azure_name_dataset",
+    default=script_params_local['azure_name_dataset']  # path for local debugging
 )
 parser.add_argument(
     "--path_trained_model",
@@ -39,10 +38,15 @@ print("parsing args")
 args = parser.parse_args()
 param_1 = args.param_1
 remote_execution = args.remote_execution
-source_dataset = args.source_dataset
+azure_name_dataset = args.source_dataset
 path_trained_model = args.path_trained_model
 
-def preprocessing(data, target_name):
+
+def preprocessing(data, target_name, run):
+    # log distinct pregnancy counts
+    pregnancies = data.Pregnancies.unique()
+    run.log_list('pregnancy categories', pregnancies)
+
     # get feature and target
     X = data.drop([target_name], axis=1)
     y = data[target_name]
@@ -59,7 +63,7 @@ def preprocessing(data, target_name):
     return X_train_scaled, X_test_scaled, y_train, y_test
 
 
-def train(X_train, X_test, y_train, y_test, reg):
+def train(X_train, X_test, y_train, y_test, reg, run):
     # Train a logistic regression model
     model = LogisticRegression(C=1 / reg, solver="liblinear").fit(X_train, y_train)
 
@@ -67,24 +71,26 @@ def train(X_train, X_test, y_train, y_test, reg):
     y_hat = model.predict(X_test)
     acc = np.average(y_hat == y_test)
 
-    if remote_execution:
-        # Store training result
-        run.log('Accuracy', np.float(acc))
+    # Store training result
+    run.log('Accuracy', np.float(acc))
 
-        # Save the trained model
-        os.makedirs(path_trained_model, exist_ok=True)
-        joblib.dump(value=model, filename=path_trained_model + 'diabetes_model.pkl')
+    # Plot and log the count of diabetic vs non-diabetic patients
+    diabetic_counts = data['Diabetic'].value_counts()
+    fig = plt.figure(figsize=(6, 6))
+    ax = fig.gca()
+    diabetic_counts.plot.bar(ax=ax)
+    ax.set_title('Patients with Diabetes')
+    ax.set_xlabel('Diagnosis')
+    ax.set_ylabel('Patients')
+    plt.show()
+    run.log_image(name='label distribution', plot=fig)
 
-    else:
-        # Get training result
-        print('Model accuracy is: ' + str(acc))
-
-        # Save the trained model
-        os.makedirs(path_trained_model, exist_ok=True)
-        joblib.dump(value=model, filename=path_trained_model + 'diabetes_model.pkl')
+    # Save the trained model
+    os.makedirs(path_trained_model, exist_ok=True)
+    joblib.dump(value=model, filename=path_trained_model + 'diabetes_model.pkl')
 
 
-if remote_execution:
+def main():
     #  get context from run
     run = Run.get_context()
 
@@ -92,16 +98,12 @@ if remote_execution:
     run.log('general_information', 'This is my first test')
     run.log("lr_decay", param_1)
 
-#  Load Data
-if remote_execution:
+    #  Load Data
     tab_ds = run.input_datasets['diabetes_dataset']
     df = tab_ds.to_pandas_dataframe()
 
-else:
-    df=pd.read_csv(source_dataset, sep=',', decimal='.')
+    # Preprocess Data
+    X_train_scaled, X_test_scaled, y_train, y_test = preprocessing(df, 'Diabetic', run)
 
-# Preprocess Data
-X_train_scaled, X_test_scaled, y_train, y_test = preprocessing(df, 'Diabetic')
-
-# Train Data
-train(X_train_scaled, X_test_scaled, y_train, y_test, param_1)
+    # Train Data
+    train(X_train_scaled, X_test_scaled, y_train, y_test, param_1, run)
