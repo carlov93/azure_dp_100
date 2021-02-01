@@ -1,13 +1,15 @@
-from azureml.core.run import Run
 import argparse
 import joblib
 import os
+
+from azureml.core.run import Run
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from config.config_training import script_params_local
 
@@ -25,8 +27,8 @@ parser.add_argument(
 )
 parser.add_argument(
     "--ds",
-    dest="azure_name_dataset",
-    default=script_params_local['azure_name_dataset']  # path for local debugging
+    dest="dataset",
+    default=script_params_local['path_local_data']  # path for local debugging
 )
 parser.add_argument(
     "--path_trained_model",
@@ -38,7 +40,7 @@ print("parsing args")
 args = parser.parse_args()
 param_1 = args.param_1
 remote_execution = args.remote_execution
-azure_name_dataset = args.source_dataset
+dataset = args.dataset
 path_trained_model = args.path_trained_model
 
 
@@ -99,8 +101,11 @@ def main():
     run.log("lr_decay", param_1)
 
     #  Load Data
-    tab_ds = run.input_datasets['diabetes_dataset']
-    df = tab_ds.to_pandas_dataframe()
+    if remote_execution:
+        tab_ds = run.input_datasets['diabetes_dataset']
+        df = tab_ds.to_pandas_dataframe()
+    else:
+        df = pd.read_csv('', sep=',', decimal='.')
 
     # Preprocess Data
     X_train_scaled, X_test_scaled, y_train, y_test = preprocessing(df, 'Diabetic', run)
