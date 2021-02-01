@@ -76,6 +76,12 @@ def train(X_train, X_test, y_train, y_test, reg, run):
     # Store training result
     run.log('Accuracy', np.float(acc))
 
+    # Save the trained model
+    os.makedirs(path_trained_model, exist_ok=True)
+    joblib.dump(value=model, filename=path_trained_model + 'diabetes_model.pkl')
+
+
+def visualization(data, run):
     # Plot and log the count of diabetic vs non-diabetic patients
     diabetic_counts = data['Diabetic'].value_counts()
     fig = plt.figure(figsize=(6, 6))
@@ -86,10 +92,6 @@ def train(X_train, X_test, y_train, y_test, reg, run):
     ax.set_ylabel('Patients')
     plt.show()
     run.log_image(name='label distribution', plot=fig)
-
-    # Save the trained model
-    os.makedirs(path_trained_model, exist_ok=True)
-    joblib.dump(value=model, filename=path_trained_model + 'diabetes_model.pkl')
 
 
 def main():
@@ -107,8 +109,15 @@ def main():
     else:
         df = pd.read_csv('', sep=',', decimal='.')
 
+    # Visualization of training data
+    visualization(df, run)
+
     # Preprocess Data
     X_train_scaled, X_test_scaled, y_train, y_test = preprocessing(df, 'Diabetic', run)
 
     # Train Data
     train(X_train_scaled, X_test_scaled, y_train, y_test, param_1, run)
+
+
+if __name__ == '__main__':
+    main()
